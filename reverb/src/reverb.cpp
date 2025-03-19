@@ -3,7 +3,6 @@
 
 namespace audio {
 
-// Implementazione di AudioBuffer
 AudioBuffer::AudioBuffer(size_t size, size_t channels) 
     : samples_(size, 0), channels_(channels) {}
 
@@ -36,7 +35,6 @@ void AudioBuffer::normalize() {
     }
 }
 
-// Implementazione di AudioFileIO
 AudioBuffer AudioFileIO::readWavFile(const std::string& filename) {
     SF_INFO sfInfo{};
     sfInfo.format = 0;
@@ -75,7 +73,6 @@ void AudioFileIO::writeWavFile(const std::string& filename,
     sf_close(file);
 }
 
-// Implementazione di FFTProcessor::FFTWMemory
 FFTProcessor::FFTWMemory::FFTWMemory(size_t size) {
     complexBuffer_ = (fftwf_complex*) fftwf_malloc(sizeof(fftwf_complex) * size);
     realBuffer_ = (float*) fftwf_malloc(sizeof(float) * size);
@@ -86,12 +83,10 @@ FFTProcessor::FFTWMemory::~FFTWMemory() {
     if (realBuffer_) fftwf_free(realBuffer_);
 }
 
-// Implementazione di FFTProcessor
 std::vector<std::complex<float>> FFTProcessor::forwardFFT(const std::vector<float>& input) {
     int N = input.size();
     FFTWMemory memory(N);
     
-    // Copia i dati di input nel buffer reale
     std::copy(input.begin(), input.end(), memory.getRealBuffer());
     
     fftwf_plan plan = fftwf_plan_dft_r2c_1d(N, memory.getRealBuffer(), 
@@ -113,7 +108,6 @@ std::vector<float> FFTProcessor::inverseFFT(const std::vector<std::complex<float
     int N = originalSize;
     FFTWMemory memory(N);
     
-    // Copia i dati di input nel buffer complesso
     for (int i = 0; i < N/2 + 1; ++i) {
         memory.getComplexBuffer()[i][0] = input[i].real();
         memory.getComplexBuffer()[i][1] = input[i].imag();
@@ -125,41 +119,34 @@ std::vector<float> FFTProcessor::inverseFFT(const std::vector<std::complex<float
     
     std::vector<float> result(N);
     for (int i = 0; i < N; ++i) {
-        result[i] = memory.getRealBuffer()[i] / N;  // Normalizzazione
+        result[i] = memory.getRealBuffer()[i] / N;  
     }
     
     fftwf_destroy_plan(plan);
     return result;
 }
 
-// Implementazione di ReverbEffect
 ReverbEffect::ReverbEffect(const AudioBuffer& impulseResponse)
     : impulseResponse_(impulseResponse) {}
 
 AudioBuffer ReverbEffect::process(const AudioBuffer& input) {
-    // Converte in float per il processing
+    
     std::vector<float> inputFloat = input.getFloatSamples();
     std::vector<float> irFloat = impulseResponse_.getFloatSamples();
     
-    // Calcola dimensione FFT (potenza di 2)
     int fftSize = 1 << static_cast<int>(std::ceil(std::log2(
         inputFloat.size() + irFloat.size() - 1)));
     
-    // Padding
     inputFloat.resize(fftSize, 0.0f);
     irFloat.resize(fftSize, 0.0f);
     
-    // FFT
     auto inputFFT = FFTProcessor::forwardFFT(inputFloat);
     auto irFFT = FFTProcessor::forwardFFT(irFloat);
     
-    // Convoluzione nel dominio della frequenza
     auto resultFFT = convolveSpectra(inputFFT, irFFT);
     
-    // IFFT
     auto convolutionResult = FFTProcessor::inverseFFT(resultFFT, fftSize);
     
-    // Normalizza
     float maxVal = 0.0f;
     for (float sample : convolutionResult) {
         maxVal = std::max(maxVal, std::abs(sample));
@@ -171,7 +158,6 @@ AudioBuffer ReverbEffect::process(const AudioBuffer& input) {
         }
     }
     
-    // Converti in int16_t
     std::vector<int16_t> output(convolutionResult.size());
     for (size_t i = 0; i < output.size(); ++i) {
         output[i] = static_cast<int16_t>(
